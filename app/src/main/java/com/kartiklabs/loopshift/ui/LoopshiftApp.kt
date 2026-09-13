@@ -99,18 +99,8 @@ private fun StartScreen(onStart: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        Text(
-            "LOOPSHIFT",
-            fontWeight = FontWeight.Black,
-            fontSize = 34.sp,
-            letterSpacing = 5.sp
-        )
-        Text(
-            "FIND THE PATH. HOLD THE FLOW.",
-            color = Muted,
-            fontSize = 10.sp,
-            letterSpacing = 2.sp
-        )
+        Text("LOOPSHIFT", fontWeight = FontWeight.Black, fontSize = 34.sp, letterSpacing = 5.sp)
+        Text("FIND THE PATH. HOLD THE FLOW.", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
 
         Spacer(Modifier.height(30.dp))
 
@@ -120,10 +110,7 @@ private fun StartScreen(onStart: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(20.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("RUSH", fontWeight = FontWeight.Black, fontSize = 22.sp, letterSpacing = 2.sp)
                         Text("Route the pulse. Build FLOW. Survive the speed.", color = Muted, fontSize = 12.sp)
@@ -133,9 +120,7 @@ private fun StartScreen(onStart: () -> Unit) {
                 Spacer(Modifier.height(18.dp))
                 Button(
                     onClick = onStart,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("START RUSH", fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
@@ -165,15 +150,14 @@ private fun StartScreen(onStart: () -> Unit) {
         }
 
         Spacer(Modifier.weight(1f))
-        Text("KARTIK LABS  •  v1.0", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+        Text("KARTIK LABS  •  v0.3", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
     }
 }
 
 @Composable
 private fun ModePreview(title: String, state: String, modifier: Modifier) {
     Row(
-        modifier
-            .background(Panel.copy(alpha = .72f), RoundedCornerShape(16.dp))
+        modifier.background(Panel.copy(alpha = .72f), RoundedCornerShape(16.dp))
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -197,6 +181,9 @@ private fun LoopshiftGame() {
     var gameOver by remember { mutableStateOf(false) }
     var best by remember { mutableIntStateOf(prefs.getInt("best", 0)) }
     var tickMs by remember { mutableLongStateOf(1050L) }
+    var reverseRing by remember { mutableIntStateOf(-1) }
+    var showTutorial by remember { mutableStateOf(!prefs.getBoolean("tutorial_seen", false)) }
+    var tutorialPage by remember { mutableIntStateOf(0) }
     val pulse = remember { Animatable(1f) }
 
     fun haptic(strong: Boolean = false) {
@@ -214,6 +201,11 @@ private fun LoopshiftGame() {
         }
     }
 
+    fun rollHazard(currentScore: Int): Int {
+        if (currentScore < 800) return -1
+        return if (Random.nextFloat() < .30f) Random.nextInt(RINGS) else -1
+    }
+
     fun resetGame() {
         gateOffsets = List(RINGS) { Random.nextInt(SECTORS) }
         node = randomNode()
@@ -222,12 +214,13 @@ private fun LoopshiftGame() {
         combo = 0
         lives = 3
         tickMs = 1050L
+        reverseRing = -1
         paused = false
         gameOver = false
     }
 
-    LaunchedEffect(paused, gameOver, node, ringIndex) {
-        if (paused || gameOver) return@LaunchedEffect
+    LaunchedEffect(paused, gameOver, node, ringIndex, showTutorial) {
+        if (paused || gameOver || showTutorial) return@LaunchedEffect
         pulse.snapTo(1f)
         pulse.animateTo(
             targetValue = 0f,
@@ -248,6 +241,7 @@ private fun LoopshiftGame() {
                 haptic(combo >= 5)
                 node = randomNode()
                 ringIndex = RINGS - 1
+                reverseRing = rollHazard(score)
             } else {
                 ringIndex -= 1
                 haptic(false)
@@ -261,15 +255,13 @@ private fun LoopshiftGame() {
             } else {
                 node = randomNode()
                 ringIndex = RINGS - 1
+                reverseRing = rollHazard(score)
             }
         }
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -279,10 +271,18 @@ private fun LoopshiftGame() {
 
         Spacer(Modifier.height(10.dp))
 
+        if (reverseRing >= 0) {
+            Text(
+                "REVERSE RING ACTIVE",
+                color = Pink,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.8.sp
+            )
+        }
+
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             contentAlignment = Alignment.Center
         ) {
             GameBoard(
@@ -291,20 +291,36 @@ private fun LoopshiftGame() {
                 ringIndex = ringIndex,
                 combo = combo,
                 pulseProgress = pulse.value,
-                enabled = !paused && !gameOver,
+                reverseRing = reverseRing,
+                enabled = !paused && !gameOver && !showTutorial,
                 onRingTap = { tappedRing ->
                     gateOffsets = gateOffsets.toMutableList().also {
-                        it[tappedRing] = (it[tappedRing] + 1) % SECTORS
+                        val delta = if (tappedRing == reverseRing) -1 else 1
+                        it[tappedRing] = (it[tappedRing] + delta + SECTORS) % SECTORS
                     }
                     haptic(false)
                 }
             )
 
-            if (paused && !gameOver) {
+            if (showTutorial) {
+                TutorialCard(
+                    page = tutorialPage,
+                    onNext = {
+                        if (tutorialPage < 2) {
+                            tutorialPage += 1
+                        } else {
+                            showTutorial = false
+                            prefs.edit().putBoolean("tutorial_seen", true).apply()
+                        }
+                    },
+                    onSkip = {
+                        showTutorial = false
+                        prefs.edit().putBoolean("tutorial_seen", true).apply()
+                    }
+                )
+            } else if (paused && !gameOver) {
                 OverlayCard("PAUSED", "Tap resume to hold the flow") { paused = false }
-            }
-
-            if (gameOver) {
+            } else if (gameOver) {
                 OverlayCard(
                     title = "FLOW BROKEN",
                     subtitle = "Score $score  •  Best $best",
@@ -326,7 +342,10 @@ private fun LoopshiftGame() {
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Tap a ring to rotate its gate • Align the node before the outer pulse expires",
+            text = if (reverseRing >= 0)
+                "Pink ring rotates backwards • Align the node before the pulse expires"
+            else
+                "Tap a ring to rotate its gate • Align the node before the outer pulse expires",
             color = Muted,
             textAlign = TextAlign.Center,
             fontSize = 12.sp,
@@ -334,6 +353,39 @@ private fun LoopshiftGame() {
             modifier = Modifier.padding(horizontal = 18.dp)
         )
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun TutorialCard(page: Int, onNext: () -> Unit, onSkip: () -> Unit) {
+    val title = when (page) {
+        0 -> "ROUTE THE PULSE"
+        1 -> "BEAT THE TIMER"
+        else -> "WATCH FOR PINK"
+    }
+    val text = when (page) {
+        0 -> "Tap a ring to rotate its gap until the glowing gate lines up with the incoming energy node."
+        1 -> "The outer countdown drains every step. Clear all four rings before it reaches zero to score."
+        else -> "Later in a run, a pink ring may appear. Pink rings rotate in the opposite direction."
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Panel.copy(alpha = .98f)),
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.padding(26.dp).fillMaxWidth()
+    ) {
+        Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${page + 1} / 3", color = Muted, fontSize = 10.sp, letterSpacing = 1.4.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(title, fontWeight = FontWeight.Black, fontSize = 22.sp, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(10.dp))
+            Text(text, color = Color.White.copy(alpha = .86f), textAlign = TextAlign.Center, fontSize = 13.sp, lineHeight = 19.sp)
+            Spacer(Modifier.height(20.dp))
+            Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+                Text(if (page == 2) "START" else "NEXT", fontWeight = FontWeight.Black)
+            }
+            TextButton(onClick = onSkip) { Text("SKIP", color = Muted) }
+        }
     }
 }
 
@@ -346,23 +398,12 @@ private fun Header(
     paused: Boolean,
     onPause: () -> Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(
-                "LOOPSHIFT",
-                fontWeight = FontWeight.Black,
-                fontSize = 22.sp,
-                letterSpacing = 3.sp
-            )
+            Text("LOOPSHIFT", fontWeight = FontWeight.Black, fontSize = 22.sp, letterSpacing = 3.sp)
             Text("FIND THE PATH. HOLD THE FLOW.", color = Muted, fontSize = 9.sp, letterSpacing = 1.6.sp)
         }
-        FilledTonalButton(
-            onClick = onPause,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-        ) {
+        FilledTonalButton(onClick = onPause, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
             Text(if (paused) "RESUME" else "PAUSE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
@@ -379,9 +420,7 @@ private fun Header(
 @Composable
 private fun StatCard(label: String, value: String, modifier: Modifier, valueColor: Color = Color.White) {
     Column(
-        modifier
-            .background(Panel, RoundedCornerShape(14.dp))
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+        modifier.background(Panel, RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(label, color = Muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
@@ -396,6 +435,7 @@ private fun GameBoard(
     ringIndex: Int,
     combo: Int,
     pulseProgress: Float,
+    reverseRing: Int,
     enabled: Boolean,
     onRingTap: (Int) -> Unit
 ) {
@@ -405,22 +445,17 @@ private fun GameBoard(
     )
 
     Canvas(
-        modifier = Modifier
-            .aspectRatio(1f)
-            .fillMaxWidth()
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectTapGestures { tap ->
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val distance = (tap - center).getDistance()
-                    val maxRadius = minOf(size.width, size.height).toFloat() * .45f
-                    val spacing = maxRadius / RINGS
-                    val ring = (distance / spacing).toInt()
-                    if (ring in 0 until RINGS) {
-                        onRingTap(ring)
-                    }
-                }
+        modifier = Modifier.aspectRatio(1f).fillMaxWidth().pointerInput(enabled) {
+            if (!enabled) return@pointerInput
+            detectTapGestures { tap ->
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val distance = (tap - center).getDistance()
+                val maxRadius = minOf(size.width, size.height).toFloat() * .45f
+                val spacing = maxRadius / RINGS
+                val ring = (distance / spacing).toInt()
+                if (ring in 0 until RINGS) onRingTap(ring)
             }
+        }
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val maxRadius = size.minDimension * .45f
@@ -432,21 +467,14 @@ private fun GameBoard(
         val timerRadius = maxRadius * 1.07f
         val timerTopLeft = Offset(center.x - timerRadius, center.y - timerRadius)
         drawArc(
-            color = Color(0xFF17213F),
-            startAngle = -90f,
-            sweepAngle = 360f,
-            useCenter = false,
-            topLeft = timerTopLeft,
-            size = Size(timerRadius * 2f, timerRadius * 2f),
+            color = Color(0xFF17213F), startAngle = -90f, sweepAngle = 360f, useCenter = false,
+            topLeft = timerTopLeft, size = Size(timerRadius * 2f, timerRadius * 2f),
             style = Stroke(width = stroke * .45f, cap = StrokeCap.Round)
         )
         drawArc(
             color = if (pulseProgress < .28f) Pink else Cyan,
-            startAngle = -90f,
-            sweepAngle = 360f * pulseProgress,
-            useCenter = false,
-            topLeft = timerTopLeft,
-            size = Size(timerRadius * 2f, timerRadius * 2f),
+            startAngle = -90f, sweepAngle = 360f * pulseProgress, useCenter = false,
+            topLeft = timerTopLeft, size = Size(timerRadius * 2f, timerRadius * 2f),
             style = Stroke(width = stroke * .65f, cap = StrokeCap.Round)
         )
 
@@ -464,18 +492,21 @@ private fun GameBoard(
             val gateSector = gateOffsets[i]
             val rect = Size(radius * 2f, radius * 2f)
             val topLeft = Offset(center.x - radius, center.y - radius)
+            val ringColor = when {
+                i == reverseRing -> Pink
+                i == ringIndex -> Cyan
+                else -> Violet
+            }
 
             drawCircle(
-                color = Color(0xFF1A2443),
-                radius = radius,
-                center = center,
+                color = Color(0xFF1A2443), radius = radius, center = center,
                 style = Stroke(width = stroke)
             )
 
             for (sector in 0 until SECTORS) {
                 if (sector == gateSector) continue
                 drawArc(
-                    color = if (i == ringIndex) Cyan.copy(alpha = .95f) else Violet.copy(alpha = .58f),
+                    color = ringColor.copy(alpha = if (i == ringIndex || i == reverseRing) .95f else .58f),
                     startAngle = sector * segmentSweep - 90f + gapSweep / 2f,
                     sweepAngle = segmentSweep - gapSweep,
                     useCenter = false,
@@ -490,8 +521,8 @@ private fun GameBoard(
                 center.x + cos(gateAngle).toFloat() * radius,
                 center.y + sin(gateAngle).toFloat() * radius
             )
-            drawCircle(Cyan.copy(alpha = .22f), stroke * 1.5f, gatePoint)
-            drawCircle(Cyan, stroke * .55f, gatePoint)
+            drawCircle(ringColor.copy(alpha = .22f), stroke * 1.5f, gatePoint)
+            drawCircle(ringColor, stroke * .55f, gatePoint)
         }
 
         val activeRadius = ringSpacing * (ringIndex + 1)
@@ -528,14 +559,9 @@ private fun OverlayCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = Panel.copy(alpha = .96f)),
         shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .padding(34.dp)
-            .fillMaxWidth()
+        modifier = Modifier.padding(34.dp).fillMaxWidth()
     ) {
-        Column(
-            Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
             Spacer(Modifier.height(6.dp))
             Text(subtitle, color = Muted, textAlign = TextAlign.Center, fontSize = 13.sp)
@@ -549,8 +575,5 @@ private fun OverlayCard(
 
 private fun randomNode(): Node {
     val colors = listOf(Cyan, Pink, Lime, Violet)
-    return Node(
-        sector = Random.nextInt(SECTORS),
-        color = colors.random()
-    )
+    return Node(sector = Random.nextInt(SECTORS), color = colors.random())
 }
