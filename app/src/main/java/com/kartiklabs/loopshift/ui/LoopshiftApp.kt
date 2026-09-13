@@ -42,6 +42,8 @@ private const val RINGS = 4
 
 @Composable
 fun LoopshiftApp() {
+    var started by remember { mutableStateOf(false) }
+
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Cyan,
@@ -54,8 +56,130 @@ fun LoopshiftApp() {
         )
     ) {
         Surface(Modifier.fillMaxSize(), color = Void) {
-            LoopshiftGame()
+            if (started) {
+                LoopshiftGame()
+            } else {
+                StartScreen(onStart = { started = true })
+            }
         }
+    }
+}
+
+@Composable
+private fun StartScreen(onStart: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("loopshift", Context.MODE_PRIVATE) }
+    val best = remember { prefs.getInt("best", 0) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.weight(.7f))
+
+        Canvas(Modifier.size(150.dp)) {
+            val c = center
+            val stroke = size.minDimension * .045f
+            listOf(.42f, .31f, .20f).forEachIndexed { index, factor ->
+                val color = listOf(Cyan, Violet, Pink)[index]
+                drawArc(
+                    color = color,
+                    startAngle = -78f + index * 22f,
+                    sweepAngle = 292f,
+                    useCenter = false,
+                    topLeft = Offset(c.x - size.minDimension * factor, c.y - size.minDimension * factor),
+                    size = Size(size.minDimension * factor * 2f, size.minDimension * factor * 2f),
+                    style = Stroke(stroke, cap = StrokeCap.Round)
+                )
+            }
+            drawCircle(Color.White, radius = stroke * .65f, center = c)
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "LOOPSHIFT",
+            fontWeight = FontWeight.Black,
+            fontSize = 34.sp,
+            letterSpacing = 5.sp
+        )
+        Text(
+            "FIND THE PATH. HOLD THE FLOW.",
+            color = Muted,
+            fontSize = 10.sp,
+            letterSpacing = 2.sp
+        )
+
+        Spacer(Modifier.height(30.dp))
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Panel),
+            shape = RoundedCornerShape(22.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("RUSH", fontWeight = FontWeight.Black, fontSize = 22.sp, letterSpacing = 2.sp)
+                        Text("Route the pulse. Build FLOW. Survive the speed.", color = Muted, fontSize = 12.sp)
+                    }
+                    Text("BEST $best", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                Spacer(Modifier.height(18.dp))
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("START RUSH", fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ModePreview("ZEN", "SOON", Modifier.weight(1f))
+            ModePreview("DAILY SHIFT", "SOON", Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.height(22.dp))
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Panel.copy(alpha = .65f)),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("HOW TO PLAY", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.4.sp)
+                Text("1  Tap a ring to rotate its glowing gate.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
+                Text("2  Align the gate with the incoming energy node.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
+                Text("3  Clear all four rings to score and build FLOW.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
+                Text("4  Miss three pulses and the run is over.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
+            }
+        }
+
+        Spacer(Modifier.weight(1f))
+        Text("KARTIK LABS  •  v1.0", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+    }
+}
+
+@Composable
+private fun ModePreview(title: String, state: String, modifier: Modifier) {
+    Row(
+        modifier
+            .background(Panel.copy(alpha = .72f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        Text(state, color = Muted, fontSize = 8.sp, letterSpacing = 1.sp)
     }
 }
 
