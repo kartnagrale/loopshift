@@ -282,7 +282,7 @@ private fun GameBoard(
                 detectTapGestures { tap ->
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val distance = (tap - center).getDistance()
-                    val maxRadius = size.minDimension * .45f
+                    val maxRadius = minOf(size.width, size.height).toFloat() * .45f
                     val spacing = maxRadius / RINGS
                     val ring = (distance / spacing).toInt()
                     if (ring in 0 until RINGS) {
