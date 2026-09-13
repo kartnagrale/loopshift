@@ -5,7 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
-import kotlinx.coroutines.delay
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -161,7 +160,7 @@ private fun StartScreen(onStart: () -> Unit) {
                 Text("1  Tap a ring to rotate its glowing gate.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
                 Text("2  Align the gate with the incoming energy node.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
                 Text("3  Clear all four rings to score and build FLOW.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
-                Text("4  Miss three pulses and the run is over.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
+                Text("4  Beat the pulse timer. Three misses end the run.", color = Color.White.copy(alpha = .90f), fontSize = 12.sp)
             }
         }
 
@@ -198,6 +197,7 @@ private fun LoopshiftGame() {
     var gameOver by remember { mutableStateOf(false) }
     var best by remember { mutableIntStateOf(prefs.getInt("best", 0)) }
     var tickMs by remember { mutableLongStateOf(1050L) }
+    val pulse = remember { Animatable(1f) }
 
     fun haptic(strong: Boolean = false) {
         val vibrator = context.getSystemService(Vibrator::class.java) ?: return
@@ -226,9 +226,14 @@ private fun LoopshiftGame() {
         gameOver = false
     }
 
-    LaunchedEffect(paused, gameOver, node, ringIndex, gateOffsets) {
+    LaunchedEffect(paused, gameOver, node, ringIndex) {
         if (paused || gameOver) return@LaunchedEffect
-        delay(tickMs)
+        pulse.snapTo(1f)
+        pulse.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = tickMs.toInt(), easing = LinearEasing)
+        )
+
         val gate = gateOffsets[ringIndex]
         if (gate == node.sector) {
             if (ringIndex == 0) {
@@ -285,6 +290,7 @@ private fun LoopshiftGame() {
                 node = node,
                 ringIndex = ringIndex,
                 combo = combo,
+                pulseProgress = pulse.value,
                 enabled = !paused && !gameOver,
                 onRingTap = { tappedRing ->
                     gateOffsets = gateOffsets.toMutableList().also {
@@ -320,7 +326,7 @@ private fun LoopshiftGame() {
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Tap a ring to rotate its gate • Align the glowing node before the pulse",
+            text = "Tap a ring to rotate its gate • Align the node before the outer pulse expires",
             color = Muted,
             textAlign = TextAlign.Center,
             fontSize = 12.sp,
@@ -389,6 +395,7 @@ private fun GameBoard(
     node: Node,
     ringIndex: Int,
     combo: Int,
+    pulseProgress: Float,
     enabled: Boolean,
     onRingTap: (Int) -> Unit
 ) {
@@ -421,6 +428,27 @@ private fun GameBoard(
         val stroke = size.minDimension * .018f
         val segmentSweep = 360f / SECTORS
         val gapSweep = 24f
+
+        val timerRadius = maxRadius * 1.07f
+        val timerTopLeft = Offset(center.x - timerRadius, center.y - timerRadius)
+        drawArc(
+            color = Color(0xFF17213F),
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = timerTopLeft,
+            size = Size(timerRadius * 2f, timerRadius * 2f),
+            style = Stroke(width = stroke * .45f, cap = StrokeCap.Round)
+        )
+        drawArc(
+            color = if (pulseProgress < .28f) Pink else Cyan,
+            startAngle = -90f,
+            sweepAngle = 360f * pulseProgress,
+            useCenter = false,
+            topLeft = timerTopLeft,
+            size = Size(timerRadius * 2f, timerRadius * 2f),
+            style = Stroke(width = stroke * .65f, cap = StrokeCap.Round)
+        )
 
         drawCircle(
             brush = Brush.radialGradient(
