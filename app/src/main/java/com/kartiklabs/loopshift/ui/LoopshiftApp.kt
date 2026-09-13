@@ -284,9 +284,9 @@ private fun GameBoard(
                     val distance = (tap - center).getDistance()
                     val maxRadius = size.minDimension * .45f
                     val spacing = maxRadius / RINGS
-                    val ring = ((maxRadius - distance) / spacing).toInt()
+                    val ring = (distance / spacing).toInt()
                     if (ring in 0 until RINGS) {
-                        onRingTap(RINGS - 1 - ring)
+                        onRingTap(ring)
                     }
                 }
             }
@@ -308,7 +308,7 @@ private fun GameBoard(
         )
 
         repeat(RINGS) { i ->
-            val radius = maxRadius - i * ringSpacing
+            val radius = ringSpacing * (i + 1)
             val gateSector = gateOffsets[i]
             val rect = Size(radius * 2f, radius * 2f)
             val topLeft = Offset(center.x - radius, center.y - radius)
@@ -342,7 +342,7 @@ private fun GameBoard(
             drawCircle(Cyan, stroke * .55f, gatePoint)
         }
 
-        val activeRadius = maxRadius - ringIndex * ringSpacing
+        val activeRadius = ringSpacing * (ringIndex + 1)
         val angle = Math.toRadians((node.sector * segmentSweep - 90f).toDouble())
         val nodePoint = Offset(
             center.x + cos(angle).toFloat() * activeRadius,
